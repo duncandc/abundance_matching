@@ -9,9 +9,10 @@ functions used to calculate abundance functions, e.g. halo mass function, given 
 
 import numpy as np
 from scipy import optimize
+import sys
+import matplotlib.pyplot as plt
 
-
-def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter'):
+def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter', show_fit=True):
     """
     given objects with property 'x' and weights, fit a functional form to the raw 
     abundances.
@@ -36,13 +37,31 @@ def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter'):
     
     """
     
+    #get empirical measurements of the abundance function
     dn, x = raw_abundance(x, weights, bins, xlog=xlog, monotonic_correction=False)
     
-    params, cov = _get_fitting_function(fit_type)
+    #get function forms of the fitting function
+    f_fit, log_f_fit = _get_fitting_function(fit_type)
+   
+    #get initial guesses for the schechter parameters
+    n0 = np.median(dn) 
+    x0 = np.median(x)
+    s0 = np.median((np.log10(dn)[1:]-np.log10(dn)[:-1])/np.diff(x))
     
-    optimize.curve_fit(f_fit, x, dn)
+    #fit function
+    params, cov = optimize.curve_fit(log_f_fit, x, np.log10(dn), p0=[n0,x0,s0])
+
+    #apply fitted parameters to function
+    dndx = lambda x: f_fit(x,*params)
     
-    dndx = Lambda x: f_fit(x,*params)
+    #plot mass function
+    fig = plt.figure(figsize=(3.3,3.3))
+    fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
+    plt.plot(x,dn,'.')
+    plt.plot(x,dndx(x),'-')
+    plt.yscale('log')
+    plt.ylim([10**-7,10**1])
+    plt.show(block=show_fit)
     
     return dndx
 
@@ -70,7 +89,7 @@ def raw_abundance(x, weights, bins, xlog=True, monotonic_correction=True):
     dndx: dn, x
     """
     
-    if use_log==True:
+    if xlog==True:
         x = np.log10(x)
     
     if np.shape(weights)==():
@@ -122,16 +141,71 @@ def _get_fitting_function(name):
     """
 
     def schechter_function(x, a, b, c):
-         return a * (x/b)**c * np.exp(-x)
+        x = 10**x
+        b = 10**b
+        val = a * (x/b)**c * np.exp(-x/b)
+        return val
+    
+    def log_schechter_function(x, a, b, c):
+        x = 10**x
+        b = 10**b
+        val = a * (x/b)**c * np.exp(-x/b)
+        return np.log10(val)
 
-    def double_schechter_function(x, a1, b1, c1, a2, b2, c2):
-         return a1 * (x/b1)**c1 * np.exp(-x) + a1 * (x/b1)**c1 * np.exp(-x)
+    def double_schechter_function(x, a1, b1, c1, a2, c2):
+        x = 10**x
+        b1 = 10**b1
+        val = a1 * (x/b1)**c1 * np.exp(-x/b1) + a2 * (x/b1)**c2 * np.exp(-x/b1)
+        return val
+    
+    def log_double_schechter_function(x, a1, b1, c1, a2, c2):
+        x = 10**x
+        b1 = 10**b1
+        val = a1 * (x/b1)**c1 * np.exp(-x/b1) + a2 * (x/b1)**c2 * np.exp(-x/b1)
+        return np.log10(val)
+         
         
     if name=='schechter':
-        return schechter_function
+        return schechter_function, log_schechter_function
     elif name=='double_schechter':
-        return double_schechter_function
+        return double_schechter_function, log_double_schechter_function
     else:
         raise ValueError("fitting function not avalable.")
 
 
+def _is_monotonic(x,y):
+    """
+    Is the tabulated function y(x) monotonically increasing or decreasing?
+    """
+    sorted_inds = np.argsort(x)
+    x = x[sorted_inds]
+    y = y[sorted_inds]
+    
+    N_greater = 0
+    N_less = 0
+    for i in range(1,len(x)):
+       if y[i]>y[i-1]: N_greater = N_greater+1
+       else: N_less = N_less+1
+    
+    if (N_greater==len(x)-1) | (N_less==len(x)-1):
+        return True
+    else: return False
+
+def _is_reversed(x,y):
+    """
+    Does the tabulated function y(x) decrease for increasing x?
+    """
+    sorted_inds = np.argsort(x)
+    x = x[sorted_inds]
+    y = y[sorted_inds]
+    
+    N_greater = 0
+    N_less = 0
+    
+    for i in range(1,len(x)):
+       if y[i]>y[i-1]: N_greater = N_greater+1
+       else: N_less = N_less+1
+    
+    if (N_greater > N_less):
+        return False
+    else: return True

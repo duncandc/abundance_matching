@@ -1,4 +1,4 @@
-
+import numpy as np
 
 def make_SHAM_mock(mock, P_xy, mock_prop='mvir', gal_prop='mstar', use_log_mock_prop=True):
     """
