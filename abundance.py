@@ -54,14 +54,15 @@ def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter', show_fit=Tr
     #apply fitted parameters to function
     dndx = lambda x: f_fit(x,*params)
     
-    #plot mass function
-    fig = plt.figure(figsize=(3.3,3.3))
-    fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
-    plt.plot(x,dn,'.')
-    plt.plot(x,dndx(x),'-')
-    plt.yscale('log')
-    plt.ylim([10**-7,10**1])
-    plt.show(block=show_fit)
+    if show_fit:
+        #plot mass function
+        fig = plt.figure(figsize=(3.3,3.3))
+        fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
+        plt.plot(x,dn,'.')
+        plt.plot(x,dndx(x),'-')
+        plt.yscale('log')
+        plt.ylim([10**-7,10**1])
+        plt.show()
     
     return dndx
 
