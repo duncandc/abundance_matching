@@ -26,13 +26,13 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     """
     Abundance match galaxy property 'x' to halo property 'y'.
     
-    Functional forms of the abundance of galaxies and haloes are required.
+    Tabulated abundances of galaxies and haloes are required.
     
-    Determines P(x_gal | y_halo), given the centered distribution, i.e. all other moments.
+    Determines the mean of P(x_gal | y_halo), given the centered distribution, i.e. all other moments.
     
     In detail P should be of the form: P_x(y, mu_xy(y)), where y is a property of the halo
     and mu_xy(y) is the mean of the distribution as a function of y.  This function simply
-    solves for the form of mu_xy, returning the full conditional probability function.
+    solves for the form of mu_xy.
     
     Parameters
     ==========
