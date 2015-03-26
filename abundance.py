@@ -12,7 +12,7 @@ from scipy import optimize
 import sys
 import matplotlib.pyplot as plt
 
-def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter', show_fit=True):
+def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter', p=None, show_fit=True):
     """
     given objects with property 'x' and weights, fit a functional form to the raw 
     abundances.
@@ -31,45 +31,44 @@ def fit_abundance(x, weights, bins, xlog=True, fit_type='schechter', show_fit=Tr
     fit_type: string, optional
         type of function to use for fit
     
+    p: dict, optional
+        initial guesses of parameters in fit
+    
+    show_fit: boolean, optional
+        plot fit
+    
     Returns
     =======
     dndx: function
     
     """
+    from astropy.modeling import fitting
     
     #get empirical measurements of the abundance function
-    dn, x = raw_abundance(x, weights, bins, xlog=xlog, monotonic_correction=False)
+    dn, x, err = raw_abundance(x, weights, bins, xlog=xlog, show=False)
     
     #get function forms of the fitting function
-    f_fit, log_f_fit = _get_fitting_function(fit_type)
-   
-    #get initial guesses for the schechter parameters
-    n0 = np.median(dn) 
-    x0 = np.median(x)
-    s0 = np.median((np.log10(dn)[1:]-np.log10(dn)[:-1])/np.diff(x))
+    f_model = _get_fitting_function(fit_type)
     
-    #fit function
-    params, cov = optimize.curve_fit(log_f_fit, x, np.log10(dn), p0=[n0,x0,s0])
-
-    #apply fitted parameters to function
-    dndx = lambda x: f_fit(x,*params)
+    #fit function to tabulate abundance function
+    f_init = f_model(**p)
+    fit_f = fitting.LevMarLSQFitter()
+    f = fit_f(f_init, x, dn, weights=1.0/dn)
     
     if show_fit:
-        #plot mass function
         fig = plt.figure(figsize=(3.3,3.3))
         fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
-        plt.plot(x,dn,'.')
-        plt.plot(x,dndx(x),'-')
+        plt.errorbar(x, dn, yerr=err, fmt='.', color='k')
+        plt.plot(x,f(x),'-')
         plt.yscale('log')
-        plt.ylim([10**-7,10**1])
         plt.show()
     
-    return dndx
+    return f
 
 
-def raw_abundance(x, weights, bins, xlog=True, monotonic_correction=True):
+def raw_abundance(x, weights, bins, xlog=True, monotonic_correction=False, show=False):
     """
-    given objects with property 'x' and weights, return an abundances.
+    given objects with property 'x' and weights, return tabulated abundances.
     
     Parameters
     ==========
@@ -85,9 +84,12 @@ def raw_abundance(x, weights, bins, xlog=True, monotonic_correction=True):
     monotonic_correction: boolean, optional
         If True, attempt to correct for minor non-monotonicity
     
+    show: boolean, optional
+        plot abundance function 
+    
     Returns
     =======
-    dndx: dn, x
+    dndx: dn, x, err
     """
     
     if xlog==True:
@@ -96,80 +98,59 @@ def raw_abundance(x, weights, bins, xlog=True, monotonic_correction=True):
     if np.shape(weights)==():
         weights = np.array([weights]*len(x))
     
-    n = np.histogram(x,bins,weights=weights)[0]
+    n = np.histogram(x, bins, weights=weights)[0]
     bin_centers = (bins[:-1]+bins[1:])/2.0
     dx = bins[1:]-bins[:-1]
     dn = n/dx
     
-    #remove bins with zero counts
-    keep = (dn>0.0)
+    raw_counts = np.histogram(x, bins=bins)[0]
+    err = (1.0/np.sqrt(raw_counts))*dn
+    
+    #remove zeros
+    keep = (raw_counts>0)
     dn = dn[keep]
     bin_centers = bin_centers[keep]
+    err = err[keep]
     
-    if not _is_monotonic(dn,bin_centers):
-        print("warning, function is not monotonic.")
+    if show==True:
+        fig = plt.figure(figsize=(3.3,3.3))
+        fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
+        plt.errorbar(bin_centers, dn, yerr=err,fmt='.')
+        plt.yscale('log')
+        plt.show()
     
-    if monotonic_correction==False:
-        return dn, bin_centers
-        
-    reverse = _is_reversed(dn,bin_centers)
-    
-    sorted_inds = np.argsort(dn)
-    dn = dn[sorted_inds]
-    if reverse==True:
-        bin_centers = bin_centers[::-1]
-    
-    #if two values are exactly the same, add 0.5 an average count to one of them
-    i=0
-    avg_weight = np.mean(weights)
-    print(dn)
-    for val1,val2 in zip(dn[:-1],dn[1:]):
-        if val1==val2:
-            dn[i+1] = dn[i]+avg_weight/dx[i+1]*0.5
-            dn[i] = dn[i]-avg_weight/dx[i+1]*0.5
-        i+=1
-    
-    #check
-    if not _is_monotonic(dn,bin_centers):
-        raise ValueError("abundance function could not be calculated.")
-    
-    return dn, bin_centers
+    return dn, bin_centers, err
 
 
+####Utility Functions#####################################################################
 def _get_fitting_function(name):
     """
-    return a fitting function
+    return a model fitting function, and a function class
     """
 
-    def schechter_function(x, a, b, c):
-        x = 10**x
-        b = 10**b
-        val = a * (x/b)**c * np.exp(-x/b)
-        return val
-    
-    def log_schechter_function(x, a, b, c):
-        x = 10**x
-        b = 10**b
-        val = a * (x/b)**c * np.exp(-x/b)
-        return np.log10(val)
+    from astropy.modeling.models import custom_model
+    import custom_utilities as cu
 
-    def double_schechter_function(x, a1, b1, c1, a2, c2):
-        x = 10**x
-        b1 = 10**b1
-        val = a1 * (x/b1)**c1 * np.exp(-x/b1) + a2 * (x/b1)**c2 * np.exp(-x/b1)
+    @custom_model
+    def schechter_model(x, phi1=1, x1=1, alpha1=-1):
+        norm = np.log(10.0)*phi1
+        val = norm*(10.0**((x-x1)*(1.0+alpha1)))*np.exp(-10.0**(x-x1))
         return val
-    
-    def log_double_schechter_function(x, a1, b1, c1, a2, c2):
-        x = 10**x
-        b1 = 10**b1
-        val = a1 * (x/b1)**c1 * np.exp(-x/b1) + a2 * (x/b1)**c2 * np.exp(-x/b1)
-        return np.log10(val)
-         
-        
+
+    @custom_model
+    def double_schechter_model(x, phi1=1, phi2=1, x1=1, x2=1, alpha1=-1, alpha2=-1):
+        norm = np.log(10.0)
+        val = norm *\
+              (np.exp(-10.0**(x - x1)) * 10.0**(x - x1) *\
+                   phi1 * (10.0**((x - x1) * alpha1)) +\
+               np.exp(-10.0**(x - x2)) * 10.0**(x - x2) *\
+                   phi2 * (10.0**((x - x2) * alpha2)))
+        return val
+
     if name=='schechter':
-        return schechter_function, log_schechter_function
+        return schechter_model
     elif name=='double_schechter':
-        return double_schechter_function, log_double_schechter_function
+        return double_schechter_model
     else:
         raise ValueError("fitting function not avalable.")
 
@@ -191,6 +172,7 @@ def _is_monotonic(x,y):
     if (N_greater==len(x)-1) | (N_less==len(x)-1):
         return True
     else: return False
+
 
 def _is_reversed(x,y):
     """
