@@ -19,7 +19,7 @@ import sys
 import time
 
 
-__all__=['AM','abundance_function','make_SHAM_mock']
+__all__=['AM']
 
 
 def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
@@ -109,18 +109,22 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     y = y[inds]
     dn_dy = dn_dy[inds]
     
+    """
     #enforce monotonic abundance functions
     if not _is_monotonic(x,dn_dx):
         raise ValueError("galaxy abundance function must be monotonic")
     if not _is_monotonic(y,dn_dy):
         raise ValueError("halo abundance function must be monotonic")
+    """
     
     #check direction of increasing number density.  Usually this is reversed.
     #This affects the sign of integrations, and how interpolations are implemented.
     if _is_reversed(x,dn_dx):
         reverse_x = True
+    else: reverse_x = False
     if _is_reversed(y,dn_dy):
         reverse_y = True
+    else: reverse_y = False
     
     print("x decreases as dn_dx increases: ", reverse_x)
     print("y decreases as dn_dy increases: ", reverse_y)
@@ -138,25 +142,30 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
         y = y[keep]
         dn_dy = dn_dy[keep]
     
-    #convert tabulated abundance functions into function objects using spline 
+    #convert tabulated abundance functions into function objects using interpolation
     #interpolation.
     #galaxy abundance function
+    ln_dn_dx = interpolate.InterpolatedUnivariateSpline(x, np.log10(dn_dx))
     dn_dx = interpolate.InterpolatedUnivariateSpline(x, dn_dx)
     #halo abundance function
+    ln_dn_dy = interpolate.InterpolatedUnivariateSpline(y, np.log10(dn_dy))
     dn_dy = interpolate.InterpolatedUnivariateSpline(y, dn_dy)
     
+    """
     #plot the input abundances of galaxies and haloes
     fig = plt.figure(figsize=(3.3,3.3))
     fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
-    plt.plot(x,np.log10(dn_dx(x)),'-', color="blue")
-    plt.plot(y,np.log10(dn_dy(y)),'-', color="black")
+    plt.plot(x,ln_dn_dx(x),'-', color="blue")
+    plt.plot(y,ln_dn_dy(y),'-', color="black")
+    plt.ylim([min(ln_dn_dy(y_min),ln_dn_dy(y_max)),max(ln_dn_dy(y_min),ln_dn_dy(y_max))])
     plt.xlabel(r'$x,y$')
-    plt.ylabel(r'$dn/dx,y$')
-    plt.show(block=True)
+    plt.ylabel(r'$\log(dn/dx,y)$')
+    plt.show()
+    """
 
     #calculate the cumulative abundance functions
-    N_cum_halo = _cumulative_abundance(dn_dy, y, reverse=reverse_y)
-    N_cum_gal  = _cumulative_abundance(dn_dx, x, reverse=reverse_x)
+    N_cum_halo = _cumulative_abundance(dn_dy, y, reverse = reverse_y)
+    N_cum_gal  = _cumulative_abundance(dn_dx, x, reverse = reverse_x)
     
     #galaxy cumulative abundance function number density range must span that of the halo 
     #abundance function for abundance matching to be possible.
@@ -188,6 +197,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     keep = (x>x_pivot)
     x = x[keep]
 
+    """
     #plot the cumulative abundances of galaxies and haloes
     fig = plt.figure(figsize=(3.3,3.3))
     fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
@@ -196,6 +206,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     plt.xlabel(r'$x,y$')
     plt.ylabel(r'$N(>x,y)$')
     plt.show(block=True)
+    """
     
     ##########################################################
     #step 1: solve for first moment in the absence of scatter.  This is abundance matching
@@ -203,6 +214,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     x_y1 = N_cum_gal_inv(N_cum_halo(ys))
     x_y1 = interpolate.InterpolatedUnivariateSpline(ys, x_y1, k=1)
 
+    """
     #plot x(y)
     fig = plt.figure(figsize=(3.3,3.3))
     fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
@@ -210,6 +222,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     plt.xlabel(r'$M_{\rm vir}$')
     plt.ylabel(r'$M_{*}$')
     plt.show(block=True)
+    """
     
     #if we are assuming no scatter in the relation, we are done.
     if P_x==None:
@@ -222,6 +235,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     x_min = P1(y_min).interval(0.999)[1]
     print("Results only valid for galaxy function down to: {0} ".format(x_min))
     
+    """
     #show the first estimate of the first moment.  Also show limits.
     fig = plt.figure(figsize=(3.3,3.3))
     fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
@@ -231,6 +245,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     plt.xlabel(r'$M_{\rm vir}$')
     plt.ylabel(r'$M_{*}$')
     plt.show()
+    """
     
     ##########################################################
     #step 2: get second estimate of the first moment by integrating to get the galaxy
@@ -284,6 +299,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     #apply new estimate of the first moment to P(x|y)
     P2 = lambda y: P_x(y, mu_xy=x_y2)
     
+    """
     #plot first two estimates of the first moment of x(y)
     fig = plt.figure(figsize=(3.3,3.3))
     fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
@@ -303,13 +319,35 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     plt.ylabel(r'n')
     plt.ylim([-8,1])
     plt.show(block=True)
+    """
     
     ##########################################################
     #step 2.5, repeat step 2 a few times to refine the estimate.
     
     Pi = P2 #previous iteration of the P(x|y)
     x_yi = x_y2 #previous iteration of the x(y)
-    for i in range(0,100): 
+    #set up plotting
+    """
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(6.6, 6.6))
+    fig.subplots_adjust(left=0.1, right=0.9, bottom=0.2, top=0.9)
+    ax1 = axes[0][0]
+    ax2 = axes[0][1]
+    ax3 = axes[1][1]
+    ax4 = axes[1][0]
+    ax1.set_xlim([10,15])
+    ax1.set_ylim([6,12])
+    ax2.set_xlim([10,15])
+    ax2.set_ylim([0,5])
+    ax3.set_xlim([6,12])
+    ax3.set_ylim([6,12])
+    ax4.set_yscale('log')
+    ax4.set_xlim([6,12])
+    ax4.set_ylim([10**(-8),1])
+    ax3.plot([6,12],[6,12],'--',color='red')
+    plt.show(block=False)
+    """
+    
+    for i in range(0,10): 
         
         #define integrand
         def integrand(y,x):
@@ -336,16 +374,48 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
         #get x2(x)
         x2_x1 = N_cum_gal_inv(N_cum_halo_x(x))
         x2_x1 = interpolate.InterpolatedUnivariateSpline(x, x2_x1, k=1)
-    
+        
         #get x2(y).  This is our second estimate.
         x_yi = x2_x1(x_yi(ys))
         x_yi = interpolate.InterpolatedUnivariateSpline(ys, x_yi, k=1)
     
         #apply new estimate of the first moment to P(x|y)
         Pi = lambda y: P_x(y, mu_xy=x_yi)
+        
+        dx_yi = x_yi.derivative(n=1)
+        
+        """
+        ax1.plot(ys,x_yi(ys),color='black')
+        ax2.plot(ys,dx_yi(ys),color='black')
+        ax3.plot(x,x2_x1(x),color='black')
+        ax4.plot(x,dn_halo_dx(x),color='black')
+        plt.draw()
+        """
     
     P2 = Pi #save those final estimates for the next step
     x_y2 = x_yi
+    
+    """
+    #plot first two estimates of the first moment of x(y)
+    fig = plt.figure(figsize=(3.3,3.3))
+    fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
+    plt.plot(ys,x_y1(ys),'-',color='red')
+    plt.plot(ys,x_y2(ys),'.',color='blue',ms=2)
+    plt.xlabel(r'$M_{\rm vir}$')
+    plt.ylabel(r'$M_{*}$')
+    plt.show(block=True)
+    
+    #plot what the galaxy abundance function looks like at this step
+    fig = plt.figure(figsize=(3.3,3.3))
+    fig.subplots_adjust(left=0.2, right=0.85, bottom=0.2, top=0.9)
+    plt.plot(x,np.log10(dn_dx(x)),'-',color='red')
+    plt.plot(x,np.log10(dn_halo_dx(x)),'.',color='blue',ms=2)
+    plt.plot([x_min,x_min],[-8,1],color='grey')
+    plt.xlabel(r'$M_{*}$')
+    plt.ylabel(r'n')
+    plt.ylim([-8,1])
+    plt.show(block=True)
+    """
     
     ##########################################################
     #step 3: use the latest estimate of x(y) to solve for a new x(y) which minimizes the
@@ -389,14 +459,16 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
         
         val = np.sum(((estimate-truth)/truth)**2.0)
         
+        """
         #plot the iteration
         ax1.plot(x,np.log10(dn_halo_dx),'-',color='grey')
         ax2.plot(ys,x_y(ys),'-',color='grey')
         plt.draw()
+        """
         
         return val
 
-
+    """
     #set up plot to show progress of minimization routine
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(6.6, 3.3))
     fig.subplots_adjust(left=0.1, right=0.9, bottom=0.2, top=0.9)
@@ -410,6 +482,7 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     ax2.set_xlabel(r'$M_{\rm vir}$')
     ax2.set_ylabel(r'$M_{*}$')
     plt.show(block=False)
+    """
     
     #calculate the bounds of the parameters of solution, using the starting point is an 
     #upper-limit.
@@ -446,109 +519,6 @@ def AM(dn_dx, x, dn_dy, y, P_x=None, y_min=None, y_max=None, ny=100):
     x_y = interpolate.InterpolatedUnivariateSpline(ys, x_y, k=1)
     
     return x_y
-
-
-def make_SHAM_mock(mock, P_xy, mock_prop='mvir', gal_prop='mstar', use_log_mock_prop=True):
-    """
-    make a SHAM mock given a halo catalogue, mock, the probability of galaxy property 'x' 
-    given a halo with property 'y', where mock[mock_prop] returns halo property 'y'.
-    
-    Parameters
-    ==========
-    mock: array_like
-        structured array containing halo catalogue
-    
-    P_xy: function
-        Function that returns x_gal given y_halo
-    
-    mock_prop: string
-        key into mock which returns the halo property to build the SHAM mock
-    
-    Returns
-    =======
-    mock: structured array
-        mock with new column containing galaxy property gal_prop
-    """
-    from numpy.lib.recfunctions import append_fields
-    
-    mock = mock.view(np.recarray)
-    
-    if use_log_mock_prop==True:
-        y = np.log10(mock[mock_prop])
-    else:
-        y = mock[mock_prop]
-    
-    x = P_xy(y).rvs(len(mock))
-    
-    if gal_prop in mock.dtype.names:
-        mock[gal_prop] = x
-    else:
-        mock = append_fields(mock,gal_prop,x)
-    
-    return mock
-
-
-def abundance_function(x, weights, bins, use_log=True):
-    """
-    given observations of objects with property 'x' and weights, return an abundance 
-    function
-    
-    Parameters
-    ==========
-    x: array_like
-    
-    weights: array_like
-    
-    bins: array_like
-    
-    Returns
-    =======
-    dndx: dn, x
-    """
-    
-    if use_log==True:
-        x = np.log10(x)
-    
-    if np.shape(weights)==():
-        weights = np.array([weights]*len(x))
-    
-    n = np.histogram(x,bins,weights=weights)[0]
-    bin_centers = (bins[:-1]+bins[1:])/2.0
-    dx = bins[1:]-bins[:-1]
-    dn = n/dx
-    
-    #remove bins with zero counts
-    keep = (dn>0.0)
-    dn = dn[keep]
-    bin_centers = bin_centers[keep]
-    
-    if not _is_monotonic(dn,bin_centers):
-        print("warning, function is not monotonic.")
-        
-    reverse = _is_reversed(dn,bin_centers)
-    
-    sorted_inds = np.argsort(dn)
-    dn = dn[sorted_inds]
-    if reverse==True:
-        bin_centers = bin_centers[::-1]
-    
-    #if two values are exactly the same, add 0.5 an average count to one of them
-    i=0
-    avg_weight = np.mean(weights)
-    print(dn)
-    for val1,val2 in zip(dn[:-1],dn[1:]):
-       if val1==val2:
-           dn[i+1] = dn[i]+avg_weight/dx[i+1]*0.5
-           dn[i] = dn[i]-avg_weight/dx[i+1]*0.5
-       i+=1
-    
-    print(dn)
-    
-    #check
-    if not _is_monotonic(dn,bin_centers):
-        raise ValueError("abundance function could not be calculated.")
-    
-    return dn, bin_centers
 
 
 def _abundance_function_from_tabulated(x, dndx):
@@ -597,11 +567,12 @@ def _abundance_function_from_tabulated(x, dndx):
 def _cumulative_abundance(f,bins,reverse=True):
     """
     calculate the cumulative abundance function by integrating the differential abundance 
-    function
+    function.
     """
     
     N_sample = len(bins) #number of points to sample along function
     
+    #determine the normalization.
     if reverse==True:
         N0 = float(f(bins[-1]))*(bins[-2]-bins[-1])
     else:
