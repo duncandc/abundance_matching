@@ -1,3 +1,6 @@
+#Duncan Campbell
+#March 2015
+#Yale University
 
 """
 parameterized models of the stellar mass - halo mass relation (SMHM)
