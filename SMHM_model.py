@@ -3,7 +3,7 @@
 parameterized models of the stellar mass - halo mass relation
 """
 
-__all__=['behroozi_model']
+__all__=['Behroozi_Model','Yang_Model']
 
 import numpy as np
 
