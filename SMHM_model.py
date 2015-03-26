@@ -45,7 +45,7 @@ class Yang_Model():
         self.beta = beta
         self.gamma= gamma
     
-    def __call__(self,Mh):
+    def __call__(self, Mh):
         Mh = 10.0**Mh
         M1 = self.M1
         norm = self.norm
